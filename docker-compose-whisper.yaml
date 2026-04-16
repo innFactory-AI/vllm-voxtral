@@ -1,29 +1,31 @@
 services:
   whisper:
-    image: onerahmet/openai-whisper-asr-webservice:latest
-    container_name: whisper-asr
+    image: ghcr.io/speaches-ai/speaches:latest
+    container_name: whisper-speaches
     ports:
-      - "9000:9000"
+      - "9000:8000"
     environment:
-      # Model size: tiny, base, small, medium, large
+      # Model size: tiny, base, small, medium, large, turbo
       # base is recommended for CPU (good balance of speed/accuracy)
-      - ASR_MODEL=base
+      - WHISPER__MODEL=base
       
-      # Engine: openai_whisper, faster_whisper, whisperx
-      # faster_whisper is 4x faster on CPU
-      - ASR_ENGINE=faster_whisper
+      # Compute type for CPU: int8 (fastest), int8_float32, int8_float16, int8_bfloat16
+      - WHISPER__COMPUTE_TYPE=int8
       
-      # Model cache location
-      - ASR_MODEL_PATH=/data/whisper
+      # Device: cpu or cuda
+      - WHISPER__DEVICE=cpu
       
-      # Optional: Set language for faster processing
-      # - ASR_LANGUAGE=en
+      # Optional: Set default language for faster processing
+      # - WHISPER__LANGUAGE=en
       
       # Optional: Enable word-level timestamps
-      # - ASR_WORD_TIMESTAMPS=True
+      # - WHISPER__WORD_TIMESTAMPS=true
+      
+      # Optional: Number of CPU threads (auto-detect by default)
+      # - WHISPER__CPU_THREADS=4
     volumes:
       # Cache models to avoid re-downloading
-      - whisper-models:/data/whisper
+      - whisper-models:/root/.cache/huggingface
     restart: unless-stopped
     deploy:
       resources:

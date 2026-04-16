@@ -3,25 +3,28 @@
 Docker containerization for deploying speech transcription models with OpenAI-compatible APIs:
 
 1. **Voxtral-Mini-4B-Realtime-2602** (vLLM) - Mistral AI's high-performance model
-2. **Whisper** (CPU-compatible alternative) - OpenAI's proven transcription model
+2. **Whisper** (Speaches/CPU-compatible) - OpenAI's proven transcription model with **M4A support**
 
 > ⚠️ **Important**: Voxtral currently requires GPU. For CPU-only deployments, use the Whisper alternative (see below).
+> 
+> 📱 **iPhone Users**: Whisper supports M4A files natively (perfect for iPhone voice memos!)
 
 ## Which Model Should I Use?
 
-| Feature | Voxtral (vLLM) | Whisper ASR |
+| Feature | Voxtral (vLLM) | Whisper (Speaches) |
 |---------|----------------|-------------|
 | **Hardware** | GPU required | ✅ **CPU works!** |
 | **Performance** | Excellent (GPU) | Good (optimized for CPU) |
 | **Languages** | 13 languages | 99 languages |
+| **M4A Support** | ✅ Yes | ✅ **Yes (iPhone voice memos)** |
 | **Real-time streaming** | ✅ Yes (<500ms) | ❌ No |
 | **Batch transcription** | ✅ Yes | ✅ Yes |
 | **Setup difficulty** | Medium | Easy |
-| **Best for** | GPU users, real-time needs | CPU users, batch processing |
+| **Best for** | GPU users, real-time needs | CPU users, iPhone voice memos |
 
 **Quick recommendation:**
 - 🎯 **Have GPU?** → Use Voxtral
-- 💻 **CPU only?** → Use Whisper (fully supported)
+- 💻 **CPU only or iPhone voice memos?** → Use Whisper (fully supported)
 
 ## Features
 
@@ -31,8 +34,9 @@ Docker containerization for deploying speech transcription models with OpenAI-co
 - 🌍 **Multilingual support**: 13 languages
 - ⚡ **High performance**: Optimized for speed and accuracy
 
-**Whisper** is OpenAI's robust transcription model, now optimized for CPU. Perfect for:
+**Whisper** (via Speaches) is OpenAI's robust transcription model, optimized for CPU. Perfect for:
 - 💻 **CPU deployment**: Works great without GPU
+- 📱 **iPhone voice memos**: Native M4A/AAC support
 - 📁 **Batch transcription**: Reliable file-based transcription
 - 🌍 **Multilingual support**: 99 languages
 - 🔌 **OpenAI-compatible API**: Easy integration
@@ -79,18 +83,25 @@ curl http://localhost:9000/health
 3. **Transcribe an audio file:**
 
 ```bash
-curl -X POST "http://localhost:9000/asr" \
-  -F "audio_file=@your-audio.mp3" \
-  -F "task=transcribe" \
-  -F "language=en" \
-  -F "output=json"
+# Works with MP3, WAV, M4A (iPhone voice memos!), and more
+curl -X POST "http://localhost:9000/v1/audio/transcriptions" \
+  -F "file=@your-audio.mp3" \
+  -F "model=base"
+```
+
+**iPhone voice memo example (M4A):**
+
+```bash
+curl -X POST "http://localhost:9000/v1/audio/transcriptions" \
+  -F "file=@voice_memo.m4a" \
+  -F "model=base" \
+  -F "language=en"
 ```
 
 **Response:**
 ```json
 {
-  "text": "Your transcribed text here",
-  "language": "en"
+  "text": "Your transcribed text here"
 }
 ```
 
@@ -98,6 +109,7 @@ That's it! The Whisper service will:
 - Download the model on first run (~150MB for base model)
 - Cache it for future use
 - Be ready to transcribe audio files on CPU
+- **Support M4A files natively** (iPhone voice memos work perfectly!)
 
 ### Option B: Voxtral (GPU Required)
 
@@ -130,134 +142,144 @@ The Voxtral service will:
 
 ## Usage Examples
 
-### Whisper ASR API (CPU-Compatible)
+### Whisper API (OpenAI-Compatible, CPU)
 
-Running on port 9000 by default.
+Running on port 9000 by default. **Fully supports M4A files (iPhone voice memos)!**
 
 **Basic transcription:**
 
 ```bash
-curl -X POST "http://localhost:9000/asr" \
-  -F "audio_file=@meeting.mp3" \
-  -F "task=transcribe" \
-  -F "language=en" \
-  -F "output=json"
+curl -X POST "http://localhost:9000/v1/audio/transcriptions" \
+  -F "file=@meeting.mp3" \
+  -F "model=base"
 ```
 
 **Response:**
 ```json
 {
-  "text": "This is the transcribed text from your audio file.",
-  "language": "en"
+  "text": "This is the transcribed text from your audio file."
 }
 ```
 
-**With word-level timestamps:**
+**iPhone voice memo (M4A file):**
 
 ```bash
-curl -X POST "http://localhost:9000/asr" \
-  -F "audio_file=@podcast.wav" \
-  -F "task=transcribe" \
-  -F "language=en" \
-  -F "output=json" \
-  -F "word_timestamps=true"
+curl -X POST "http://localhost:9000/v1/audio/transcriptions" \
+  -F "file=@voice_memo.m4a" \
+  -F "model=base" \
+  -F "language=en"
+```
+
+**With verbose output (includes timestamps):**
+
+```bash
+curl -X POST "http://localhost:9000/v1/audio/transcriptions" \
+  -F "file=@podcast.wav" \
+  -F "model=base" \
+  -F "response_format=verbose_json"
 ```
 
 **Response with timestamps:**
 ```json
 {
+  "task": "transcribe",
+  "language": "en",
+  "duration": 10.5,
   "text": "Hello world",
   "segments": [
     {
+      "id": 0,
       "start": 0.0,
       "end": 0.5,
-      "text": "Hello"
+      "text": "Hello",
+      "no_speech_prob": 0.01
     },
     {
+      "id": 1,
       "start": 0.5,
       "end": 1.0,
-      "text": "world"
+      "text": "world",
+      "no_speech_prob": 0.02
     }
-  ],
-  "language": "en"
+  ]
 }
 ```
 
-**Auto-detect language (no language parameter):**
+**Auto-detect language:**
 
 ```bash
-curl -X POST "http://localhost:9000/asr" \
-  -F "audio_file=@unknown-language.mp3" \
-  -F "task=transcribe" \
-  -F "output=json"
+curl -X POST "http://localhost:9000/v1/audio/transcriptions" \
+  -F "file=@unknown-language.mp3" \
+  -F "model=base"
 ```
 
 **Translate to English (for non-English audio):**
 
 ```bash
-curl -X POST "http://localhost:9000/asr" \
-  -F "audio_file=@spanish-audio.mp3" \
-  -F "task=translate" \
-  -F "output=json"
+curl -X POST "http://localhost:9000/v1/audio/translations" \
+  -F "file=@spanish-audio.mp3" \
+  -F "model=base"
 ```
 
 **Supported audio formats:**
-- MP3, MP4, MPEG, MPGA, M4A
-- WAV, WEBM, OGG, FLAC
-- Virtually any format (FFmpeg support)
+- ✅ **M4A** (iPhone voice memos)
+- ✅ MP3, MP4, MPEG, MPGA
+- ✅ WAV, WEBM, OGG, FLAC
+- ✅ Virtually any format (FFmpeg support)
 
-**Available output formats:**
-- `json` - JSON with transcription text
-- `srt` - SubRip subtitle format
-- `vtt` - WebVTT subtitle format
-- `tsv` - Tab-separated values
-- `txt` - Plain text
-
-**Python client example:**
+**Python client example (OpenAI-compatible):**
 
 ```python
-import requests
+from openai import OpenAI
 
-# Transcribe audio file
-with open("audio.mp3", "rb") as f:
-    response = requests.post(
-        "http://localhost:9000/asr",
-        files={"audio_file": f},
-        data={
-            "task": "transcribe",
-            "language": "en",
-            "output": "json"
-        }
+# Point to local Whisper service
+client = OpenAI(
+    base_url="http://localhost:9000/v1",
+    api_key="not-needed"
+)
+
+# Transcribe any audio file (including M4A!)
+with open("voice_memo.m4a", "rb") as f:
+    transcription = client.audio.transcriptions.create(
+        model="base",
+        file=f,
+        language="en",
+        response_format="verbose_json"
     )
 
-result = response.json()
-print(result["text"])
+print(transcription.text)
 ```
 
-**Batch processing multiple files:**
+**Batch processing multiple files (including M4A):**
 
 ```python
-import requests
+from openai import OpenAI
 from pathlib import Path
+
+client = OpenAI(
+    base_url="http://localhost:9000/v1",
+    api_key="not-needed"
+)
 
 audio_dir = Path("./audio_files")
 output_dir = Path("./transcriptions")
 output_dir.mkdir(exist_ok=True)
 
-for audio_file in audio_dir.glob("*.mp3"):
-    print(f"Transcribing {audio_file.name}...")
-    
-    with open(audio_file, "rb") as f:
-        response = requests.post(
-            "http://localhost:9000/asr",
-            files={"audio_file": f},
-            data={"task": "transcribe", "language": "en", "output": "json"}
-        )
-    
-    result = response.json()
-    output_file = output_dir / f"{audio_file.stem}.txt"
-    output_file.write_text(result["text"])
-    print(f"✓ Saved to {output_file}")
+# Process all audio files (MP3, M4A, WAV, etc.)
+for audio_file in audio_dir.glob("*"):
+    if audio_file.suffix.lower() in ['.mp3', '.m4a', '.wav', '.flac', '.ogg']:
+        print(f"Transcribing {audio_file.name}...")
+        
+        with open(audio_file, "rb") as f:
+            transcription = client.audio.transcriptions.create(
+                model="base",
+                file=f,
+                language="en"
+            )
+        
+        output_file = output_dir / f"{audio_file.stem}.txt"
+        output_file.write_text(transcription.text)
+        print(f"✓ Saved to {output_file}")
 ```
 
 ### Voxtral API (GPU Only)
@@ -499,42 +521,57 @@ sf.write("output.wav", audio, 16000, subtype='PCM_16')
 
 ### Whisper Configuration (docker-compose-whisper.yaml)
 
+Whisper is powered by **Speaches** (faster-whisper server) with native M4A support.
+
 **Environment Variables:**
 
-- `ASR_MODEL`: Model size - `tiny`, `base` (recommended), `small`, `medium`, `large`
+- `WHISPER__MODEL`: Model size - `tiny`, `base` (recommended), `small`, `medium`, `large`, `turbo`
   - `tiny` - Fastest, less accurate (~40MB)
   - `base` - **Recommended for CPU** - good balance (~150MB)
   - `small` - Better accuracy, slower (~500MB)
   - `medium` - High accuracy, slow (~1.5GB)
   - `large` - Best accuracy, very slow (~3GB)
+  - `turbo` - Latest OpenAI model, faster than large
 
-- `ASR_ENGINE`: Backend engine - `faster_whisper` (recommended), `openai_whisper`, `whisperx`
-  - `faster_whisper` - **4x faster on CPU**, optimized
-  - `openai_whisper` - Original implementation
-  - `whisperx` - Includes speaker diarization
+- `WHISPER__COMPUTE_TYPE`: CPU optimization - `int8` (recommended), `int8_float32`, `float16`
+  - `int8` - **Fastest on CPU**, 4x faster than original
+  - Lower precision = faster, but minimal accuracy loss
 
-- `ASR_LANGUAGE`: Default language (optional, auto-detect if not set)
+- `WHISPER__DEVICE`: `cpu` or `cuda` (use `cpu` for this setup)
+
+- `WHISPER__LANGUAGE`: Default language (optional, auto-detect if not set)
   - Examples: `en`, `es`, `fr`, `de`, `zh`, etc.
 
-- `ASR_WORD_TIMESTAMPS`: Enable word-level timestamps (`True`/`False`)
+- `WHISPER__WORD_TIMESTAMPS`: Enable word-level timestamps (`true`/`false`)
 
-**Example - Customize model:**
+- `WHISPER__CPU_THREADS`: Number of CPU threads (auto-detect by default)
+
+**Example - Optimize for speed:**
 
 ```yaml
 environment:
-  - ASR_MODEL=small  # Use larger model for better accuracy
-  - ASR_ENGINE=faster_whisper
-  - ASR_LANGUAGE=en  # Set default language
-  - ASR_WORD_TIMESTAMPS=True
+  - WHISPER__MODEL=tiny  # Fastest model
+  - WHISPER__COMPUTE_TYPE=int8  # Maximum CPU optimization
+  - WHISPER__LANGUAGE=en  # Skip language detection
+  - WHISPER__CPU_THREADS=4
+```
+
+**Example - Optimize for accuracy:**
+
+```yaml
+environment:
+  - WHISPER__MODEL=small  # Better accuracy
+  - WHISPER__COMPUTE_TYPE=int8
+  - WHISPER__WORD_TIMESTAMPS=true  # Get word-level timestamps
 ```
 
 **Port Configuration:**
 
-Whisper runs on port 9000 by default. To change:
+Whisper runs on port 9000 (mapped from internal 8000). To change external port:
 
 ```yaml
 ports:
-  - "YOUR_PORT:9000"
+  - "YOUR_PORT:8000"  # Note: internal port is 8000
 ```
 
 **Memory Limits:**
@@ -606,14 +643,17 @@ deploy:
 
 ## API Endpoints
 
-### Whisper ASR (Port 9000)
+### Whisper (Speaches) - Port 9000
 
-- `POST /asr` - Audio transcription/translation
-  - Parameters: `audio_file`, `task` (transcribe/translate), `language`, `output` (json/srt/vtt/tsv/txt)
-  - Supports word-level timestamps and speaker diarization
+**OpenAI-compatible endpoints:**
+- `POST /v1/audio/transcriptions` - Transcribe audio to text
+  - Parameters: `file` (required), `model`, `language`, `response_format` (json, text, verbose_json)
+  - **Supports M4A files natively!**
+- `POST /v1/audio/translations` - Translate audio to English
+- `GET /v1/models` - List available models
 - `GET /health` - Health check
 
-**Full documentation:** [Whisper ASR Webservice Docs](https://github.com/ahmetoner/whisper-asr-webservice)
+**Full documentation:** [Speaches API Docs](https://github.com/speaches-ai/speaches)
 
 ### Voxtral vLLM (Port 8000)
 
@@ -796,11 +836,11 @@ docker compose down -v
 
 ## Tech Stack
 
-### Whisper ASR
+### Whisper (Speaches)
+- **Speaches**: OpenAI-compatible Whisper API server
 - **faster-whisper**: Optimized Whisper implementation (4x faster on CPU)
-- **Whisper ASR Webservice**: OpenAI-compatible REST API wrapper
+- **PyAV**: Bundled FFmpeg for universal audio format support (including M4A)
 - **Docker**: Containerization
-- **FFmpeg**: Universal audio format support
 
 ### Voxtral vLLM
 - **vLLM**: High-performance LLM inference engine
@@ -811,20 +851,20 @@ docker compose down -v
 
 ## Model Comparison
 
-| Feature | Whisper (CPU) | Voxtral (GPU) |
+| Feature | Whisper (Speaches/CPU) | Voxtral (GPU) |
 |---------|---------------|---------------|
 | **Hardware** | ✅ CPU (no GPU needed) | GPU required (8GB+ VRAM) |
+| **M4A Support** | ✅ **Native (iPhone voice memos)** | ✅ Yes |
 | **Model Size** | 40MB - 3GB (configurable) | ~4GB |
 | **Processing Speed (1min audio)** | 5-30s (depends on model size) | 2-5s |
 | **Languages** | 99 languages | 13 languages |
 | **Batch Transcription** | ✅ Yes | ✅ Yes |
 | **Real-time Streaming** | ❌ No | ✅ Yes (<500ms) |
 | **Word Timestamps** | ✅ Yes | ✅ Yes |
-| **Speaker Diarization** | ✅ Yes (with whisperX) | ❌ No |
-| **API Compatibility** | OpenAI-like | OpenAI-compatible |
-| **Docker Image** | `onerahmet/openai-whisper-asr-webservice` | Custom vLLM build |
+| **API Compatibility** | ✅ OpenAI-compatible | ✅ OpenAI-compatible |
+| **Docker Image** | `ghcr.io/speaches-ai/speaches` | Custom vLLM build |
 | **Port** | 9000 | 8000 |
-| **Best For** | CPU users, batch processing, cost-effective | GPU users, real-time, high throughput |
+| **Best For** | **iPhone voice memos**, CPU users, batch processing | GPU users, real-time, high throughput |
 
 ## Supported Languages
 
@@ -844,8 +884,8 @@ MIT License - Copyright 2026 innFactory AI Consulting
 
 ## Resources
 
-### Whisper ASR
-- [Whisper ASR Webservice GitHub](https://github.com/ahmetoner/whisper-asr-webservice)
+### Whisper (Speaches)
+- [Speaches GitHub](https://github.com/speaches-ai/speaches)
 - [OpenAI Whisper](https://github.com/openai/whisper)
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 
