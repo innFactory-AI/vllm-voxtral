@@ -1,16 +1,43 @@
 # vLLM Voxtral
 
-Docker containerization for deploying Mistral AI's **Voxtral-Mini-4B-Realtime-2602** model using vLLM - a high-performance real-time speech transcription (ASR) model with OpenAI-compatible API.
+Docker containerization for deploying Mistral AI's **Voxtral-Mini-4B-Realtime-2602** model using vLLM - a high-performance speech transcription (ASR) model with OpenAI-compatible API.
 
-**Voxtral** is a multilingual, real-time audio transcription model that supports 13 languages with sub-500ms latency, perfect for live transcription, voice assistants, and streaming audio applications.
+**Voxtral** is a multilingual audio transcription model that supports 13 languages. Perfect for:
+- 📁 **Batch transcription**: Upload audio files and get text transcriptions
+- 🎙️ **Real-time streaming**: Live transcription with sub-500ms latency (GPU only)
+- 🌍 **Multilingual support**: Transcribe in 13 different languages
+- 🔌 **OpenAI-compatible API**: Drop-in replacement for OpenAI's transcription API
+
+## Common Use Cases
+
+1. **File-based transcription** (Recommended - Works on both GPU and CPU):
+   - Upload an audio file (MP3, WAV, M4A, etc.)
+   - Get back the full transcription
+   - No real-time requirements
+   - Perfect for: Meeting recordings, podcasts, voicemails, interviews
+
+2. **Real-time streaming transcription** (GPU required):
+   - Stream audio as it's being recorded
+   - Get incremental transcription updates
+   - Sub-500ms latency
+   - Perfect for: Live captioning, voice assistants
 
 ## Prerequisites
 
+### For GPU Deployment
 - Docker and Docker Compose
-- NVIDIA GPU with CUDA support
+- NVIDIA GPU with CUDA support (minimum 8GB VRAM)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+- Best for: Production, fast processing, real-time streaming
+
+### For CPU Deployment
+- Docker and Docker Compose
+- x86_64 or ARM64 CPU (8GB+ RAM recommended)
+- Best for: Development, testing, batch processing where speed is not critical
 
 ## Quick Start
+
+### GPU Deployment
 
 1. **Build and start the service:**
 
@@ -18,36 +45,49 @@ Docker containerization for deploying Mistral AI's **Voxtral-Mini-4B-Realtime-26
 docker compose up -d --build
 ```
 
-The service will:
-- Download the Voxtral model from HuggingFace (first run only)
-- Start the vLLM server on port 8000
-- Cache the model in a persistent volume
+### CPU Deployment
 
-2. **Check if the service is running:**
+1. **Start the CPU service:**
+
+```bash
+docker compose -f docker-compose-cpu.yaml up -d
+```
+
+### Verify Service is Running
+
+2. **Check health:**
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-3. **List available models:**
+3. **Test with a quick transcription:**
 
 ```bash
-curl http://localhost:8000/v1/models
+curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
+  -F "file=@your-audio.mp3" \
+  -F "model=mistralai/Voxtral-Mini-4B-Realtime-2602"
 ```
+
+The service will:
+- Download the Voxtral model from HuggingFace on first run (cached afterwards)
+- Start the vLLM server on port 8000
+- Be ready to accept audio files for transcription
 
 ## Model Capabilities
 
 **Voxtral-Mini-4B-Realtime-2602** is a speech-to-text transcription model that:
-- Transcribes audio in real-time with <500ms latency
 - Supports 13 languages: English, Spanish, French, Portuguese, Hindi, German, Dutch, Italian, Arabic, Chinese, Japanese, Korean, Russian
-- Processes streaming audio incrementally as it arrives
-- Achieves offline-level accuracy with real-time performance
+- Works in two modes:
+  - **Batch mode**: Upload complete audio files for transcription (works on GPU and CPU)
+  - **Streaming mode**: Real-time transcription with <500ms latency (GPU only)
+- Handles various audio formats: MP3, WAV, M4A, FLAC, OGG, and more
 
 ## Usage Examples
 
-### Audio Transcription (REST API)
+### Batch Transcription (File Upload → Text)
 
-The transcription endpoint accepts audio files and returns text transcriptions.
+This is the most common use case and works well on both GPU and CPU deployments.
 
 **Basic transcription with curl:**
 
@@ -57,24 +97,53 @@ curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
   -F "model=mistralai/Voxtral-Mini-4B-Realtime-2602"
 ```
 
+**Response:**
+```json
+{
+  "text": "This is the transcribed text from your audio file."
+}
+```
+
 **With language specification:**
 
 ```bash
 curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
-  -F "file=@/path/to/audio.wav" \
+  -F "file=@/path/to/meeting.wav" \
   -F "model=mistralai/Voxtral-Mini-4B-Realtime-2602" \
   -F "language=en" \
   -F "response_format=json"
 ```
 
-**Verbose JSON response (includes timestamps):**
+**Verbose JSON response (includes word-level timestamps):**
 
 ```bash
 curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
-  -F "file=@/path/to/audio.m4a" \
+  -F "file=@/path/to/podcast.m4a" \
   -F "model=mistralai/Voxtral-Mini-4B-Realtime-2602" \
   -F "language=es" \
   -F "response_format=verbose_json"
+```
+
+**Response with timestamps:**
+```json
+{
+  "text": "Full transcription text here",
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 3.5,
+      "text": "First segment of speech"
+    },
+    {
+      "id": 1,
+      "start": 3.5,
+      "end": 7.2,
+      "text": "Second segment of speech"
+    }
+  ],
+  "language": "es"
+}
 ```
 
 **Supported audio formats:**
@@ -82,9 +151,67 @@ curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
 - WAV, WEBM
 - FLAC, OGG
 
-### Using OpenAI Python Client
+### Expected Processing Times
 
-You can use the official OpenAI Python client for audio transcription:
+| Deployment | 1-minute audio | 10-minute audio | 60-minute audio |
+|------------|----------------|-----------------|-----------------|
+| **GPU** | ~2-5 seconds | ~20-30 seconds | ~2-3 minutes |
+| **CPU** | ~15-30 seconds | ~2-5 minutes | ~15-30 minutes |
+
+*Note: Times are approximate and vary based on hardware, audio quality, and language.*
+
+### Batch Processing Multiple Files
+
+**Using a bash script:**
+
+```bash
+#!/bin/bash
+for audio_file in *.mp3; do
+  echo "Transcribing $audio_file..."
+  curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
+    -F "file=@$audio_file" \
+    -F "model=mistralai/Voxtral-Mini-4B-Realtime-2602" \
+    -F "language=en" \
+    -o "${audio_file%.mp3}.json"
+  echo "Saved to ${audio_file%.mp3}.json"
+done
+```
+
+**Using Python:**
+
+```python
+import os
+from pathlib import Path
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="not-needed"
+)
+
+# Process all audio files in a directory
+audio_dir = Path("./audio_files")
+output_dir = Path("./transcriptions")
+output_dir.mkdir(exist_ok=True)
+
+for audio_file in audio_dir.glob("*.mp3"):
+    print(f"Transcribing {audio_file.name}...")
+    
+    with open(audio_file, "rb") as f:
+        transcription = client.audio.transcriptions.create(
+            model="mistralai/Voxtral-Mini-4B-Realtime-2602",
+            file=f,
+            language="en",
+            response_format="verbose_json"
+        )
+    
+    # Save transcription
+    output_file = output_dir / f"{audio_file.stem}.txt"
+    output_file.write_text(transcription.text)
+    print(f"✓ Saved to {output_file}")
+```
+
+### Simple Python Client Example
 
 ```python
 from openai import OpenAI
@@ -95,8 +222,8 @@ client = OpenAI(
     api_key="not-needed"
 )
 
-# Transcribe an audio file
-with open("audio.mp3", "rb") as audio_file:
+# Transcribe a single audio file
+with open("meeting.mp3", "rb") as audio_file:
     transcription = client.audio.transcriptions.create(
         model="mistralai/Voxtral-Mini-4B-Realtime-2602",
         file=audio_file,
@@ -112,7 +239,11 @@ if hasattr(transcription, 'segments'):
         print(f"[{segment.start}s - {segment.end}s]: {segment.text}")
 ```
 
-### Real-time Streaming (WebSocket API)
+---
+
+### Real-time Streaming (WebSocket API) - Advanced
+
+⚠️ **Note**: Real-time streaming requires GPU deployment for low latency. This is an advanced use case.
 
 For real-time audio streaming with incremental transcription, use the WebSocket API:
 
@@ -195,9 +326,15 @@ sf.write("output.wav", audio, 16000, subtype='PCM_16')
 
 ### Environment Variables
 
+**Common Variables:**
 - `VLLM_VERSION`: vLLM Docker image version (default: `latest`)
 - `VLLM_DISABLE_COMPILE_CACHE`: Disable compilation cache (set to `1`)
 - `VLLM_MAX_AUDIO_CLIP_FILESIZE_MB`: Maximum audio file size in MB (default: `25`)
+
+**CPU-Specific Variables** (for `docker-compose-cpu.yaml`):
+- `VLLM_CPU_KVCACHE_SPACE`: KV cache size in GB (default: `40`)
+- `VLLM_CPU_OMP_THREADS_BIND`: CPU core binding (set to `auto` for automatic)
+- `VLLM_CPU_NUM_OF_RESERVED_CPU`: Number of CPU cores reserved for framework (default: `1`)
 
 ### Audio Configuration
 
@@ -263,24 +400,42 @@ For full API documentation, see:
 **View logs:**
 
 ```bash
+# For GPU deployment
 docker compose logs -f
+
+# For CPU deployment
+docker compose -f docker-compose-cpu.yaml logs -f
 ```
 
 **Check resource usage:**
 
 ```bash
+# For GPU deployment
 docker stats voxtral-voxtral-1
+
+# For CPU deployment
+docker stats voxtral-voxtral-cpu-1
 ```
 
-**Monitor GPU usage:**
+**Monitor GPU usage (GPU deployment only):**
 
 ```bash
 nvidia-smi -l 1
 ```
 
+**Monitor CPU usage (CPU deployment):**
+
+```bash
+# Monitor overall CPU usage
+htop
+
+# Or use docker stats for container-specific metrics
+docker stats --no-stream
+```
+
 ## Troubleshooting
 
-### Service won't start
+### Service won't start (GPU deployment)
 
 1. Verify GPU is available:
 ```bash
@@ -297,9 +452,35 @@ docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
 docker compose logs
 ```
 
+### Service won't start (CPU deployment)
+
+1. Check if the container is running:
+```bash
+docker compose -f docker-compose-cpu.yaml ps
+```
+
+2. View logs for errors:
+```bash
+docker compose -f docker-compose-cpu.yaml logs
+```
+
+3. Verify you have enough RAM (model requires ~8-16GB system memory)
+
 ### Out of memory errors
 
-The Voxtral-Mini-4B model requires approximately 8GB of VRAM. For long audio files, you may need to increase `--max-model-len` or use a GPU with more memory.
+**GPU deployment**: The Voxtral-Mini-4B model requires approximately 8GB of VRAM. For long audio files, you may need to increase `--max-model-len` or use a GPU with more memory.
+
+**CPU deployment**: Increase Docker memory limits or system swap space. The model requires 8-16GB of system RAM.
+
+### Slow transcription performance (CPU deployment)
+
+This is expected behavior for CPU inference. See the comparison table above for expected processing times.
+
+**Performance tips for CPU:**
+- Process shorter audio clips
+- Use batch processing for multiple files
+- Consider GPU deployment if you need faster results
+- Ensure your system has enough RAM (8-16GB recommended)
 
 ### Audio file too large
 
@@ -328,23 +509,52 @@ docker compose run --rm voxtral python -c "from huggingface_hub import snapshot_
 
 ## Stopping the Service
 
+**GPU deployment:**
+
 ```bash
 docker compose down
 ```
 
-To also remove the cached model:
+**CPU deployment:**
 
 ```bash
+docker compose -f docker-compose-cpu.yaml down
+```
+
+To also remove the cached model (both deployments):
+
+```bash
+# GPU
 docker compose down -v
+
+# CPU
+docker compose -f docker-compose-cpu.yaml down -v
 ```
 
 ## Tech Stack
 
-- **vLLM**: High-performance LLM inference engine with audio support
+- **vLLM**: High-performance LLM inference engine with audio support (GPU and CPU)
 - **Voxtral-Mini-4B-Realtime-2602**: Mistral AI's real-time speech transcription model
 - **Docker**: Containerization
-- **CUDA**: GPU acceleration
+- **CUDA**: GPU acceleration (GPU deployment only)
 - **Audio Processing**: librosa, soundfile, soxr
+
+## Deployment Comparison
+
+| Feature | GPU Deployment | CPU Deployment |
+|---------|----------------|----------------|
+| **Processing Speed** | ⚡ Very Fast (2-5s for 1min audio) | 🐌 Slower (15-30s for 1min audio) |
+| **Best For** | Production, high volume, real-time | Development, testing, low volume |
+| **Batch Transcription** | ✅ Excellent | ✅ Good (if speed isn't critical) |
+| **Real-time Streaming** | ✅ Yes (<500ms latency) | ❌ No (too slow) |
+| **Hardware Required** | NVIDIA GPU (8GB+ VRAM) | x86_64 or ARM64 CPU (8GB+ RAM) |
+| **Docker Compose File** | `docker-compose.yaml` | `docker-compose-cpu.yaml` |
+| **Docker Image** | `voxtral-vllm` (custom built) | `vllm/vllm-openai-cpu` |
+| **Cost** | Higher (GPU infrastructure) | Lower (standard CPU) |
+
+**Recommendation:**
+- 📁 **Batch transcription (file upload)**: Both GPU and CPU work fine. Use GPU for faster processing, CPU if speed isn't critical.
+- 🎙️ **Real-time streaming**: GPU required - CPU is too slow for real-time.
 
 ## Supported Languages
 

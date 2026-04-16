@@ -1,0 +1,24 @@
+services:
+  voxtral-cpu:
+    image: vllm/vllm-openai-cpu:latest-x86_64
+    entrypoint:
+      - vllm
+      - serve
+      - mistralai/Voxtral-Mini-4B-Realtime-2602
+      - --dtype=bfloat16
+    ports:
+      - "8000:8000"
+    environment:
+      - VLLM_CPU_KVCACHE_SPACE=40
+      - VLLM_CPU_OMP_THREADS_BIND=auto
+      - VLLM_CPU_NUM_OF_RESERVED_CPU=1
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+    cap_add:
+      - SYS_NICE
+    security_opt:
+      - seccomp=unconfined
+    shm_size: 4g
+
+volumes:
+  huggingface-cache:
