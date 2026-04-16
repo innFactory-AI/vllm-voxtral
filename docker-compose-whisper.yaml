@@ -1,0 +1,37 @@
+services:
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: whisper-asr
+    ports:
+      - "9000:9000"
+    environment:
+      # Model size: tiny, base, small, medium, large
+      # base is recommended for CPU (good balance of speed/accuracy)
+      - ASR_MODEL=base
+      
+      # Engine: openai_whisper, faster_whisper, whisperx
+      # faster_whisper is 4x faster on CPU
+      - ASR_ENGINE=faster_whisper
+      
+      # Model cache location
+      - ASR_MODEL_PATH=/data/whisper
+      
+      # Optional: Set language for faster processing
+      # - ASR_LANGUAGE=en
+      
+      # Optional: Enable word-level timestamps
+      # - ASR_WORD_TIMESTAMPS=True
+    volumes:
+      # Cache models to avoid re-downloading
+      - whisper-models:/data/whisper
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # Adjust based on your system resources
+          memory: 4G
+        reservations:
+          memory: 2G
+
+volumes:
+  whisper-models:

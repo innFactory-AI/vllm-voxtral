@@ -1,43 +1,105 @@
-# vLLM Voxtral
+# vLLM Voxtral + Whisper ASR
 
-Docker containerization for deploying Mistral AI's **Voxtral-Mini-4B-Realtime-2602** model using vLLM - a high-performance speech transcription (ASR) model with OpenAI-compatible API.
+Docker containerization for deploying speech transcription models with OpenAI-compatible APIs:
+
+1. **Voxtral-Mini-4B-Realtime-2602** (vLLM) - Mistral AI's high-performance model
+2. **Whisper** (CPU-compatible alternative) - OpenAI's proven transcription model
+
+> ⚠️ **Important**: Voxtral currently requires GPU. For CPU-only deployments, use the Whisper alternative (see below).
+
+## Which Model Should I Use?
+
+| Feature | Voxtral (vLLM) | Whisper ASR |
+|---------|----------------|-------------|
+| **Hardware** | GPU required | ✅ **CPU works!** |
+| **Performance** | Excellent (GPU) | Good (optimized for CPU) |
+| **Languages** | 13 languages | 99 languages |
+| **Real-time streaming** | ✅ Yes (<500ms) | ❌ No |
+| **Batch transcription** | ✅ Yes | ✅ Yes |
+| **Setup difficulty** | Medium | Easy |
+| **Best for** | GPU users, real-time needs | CPU users, batch processing |
+
+**Quick recommendation:**
+- 🎯 **Have GPU?** → Use Voxtral
+- 💻 **CPU only?** → Use Whisper (fully supported)
+
+## Features
 
 **Voxtral** is a multilingual audio transcription model that supports 13 languages. Perfect for:
 - 📁 **Batch transcription**: Upload audio files and get text transcriptions
 - 🎙️ **Real-time streaming**: Live transcription with sub-500ms latency (GPU only)
-- 🌍 **Multilingual support**: Transcribe in 13 different languages
-- 🔌 **OpenAI-compatible API**: Drop-in replacement for OpenAI's transcription API
+- 🌍 **Multilingual support**: 13 languages
+- ⚡ **High performance**: Optimized for speed and accuracy
+
+**Whisper** is OpenAI's robust transcription model, now optimized for CPU. Perfect for:
+- 💻 **CPU deployment**: Works great without GPU
+- 📁 **Batch transcription**: Reliable file-based transcription
+- 🌍 **Multilingual support**: 99 languages
+- 🔌 **OpenAI-compatible API**: Easy integration
 
 ## Common Use Cases
 
-1. **File-based transcription** (Recommended - Works on both GPU and CPU):
-   - Upload an audio file (MP3, WAV, M4A, etc.)
-   - Get back the full transcription
-   - No real-time requirements
-   - Perfect for: Meeting recordings, podcasts, voicemails, interviews
+**For batch/file transcription** (your use case):
+- ✅ **Voxtral on GPU**: Fastest, excellent accuracy
+- ✅ **Whisper on CPU**: Good speed, proven reliability, works without GPU
 
-2. **Real-time streaming transcription** (GPU required):
-   - Stream audio as it's being recorded
-   - Get incremental transcription updates
-   - Sub-500ms latency
-   - Perfect for: Live captioning, voice assistants
+**For real-time streaming transcription**:
+- ✅ **Voxtral on GPU only**: Sub-500ms latency
+- ❌ **Whisper**: Not designed for real-time
 
 ## Prerequisites
 
-### For GPU Deployment
+### Voxtral (GPU Deployment)
 - Docker and Docker Compose
 - NVIDIA GPU with CUDA support (minimum 8GB VRAM)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-- Best for: Production, fast processing, real-time streaming
 
-### For CPU Deployment
+### Whisper (CPU Deployment - Recommended if no GPU)
 - Docker and Docker Compose
-- x86_64 or ARM64 CPU (8GB+ RAM recommended)
-- Best for: Development, testing, batch processing where speed is not critical
+- x86_64 or ARM64 CPU
+- 4GB+ RAM recommended
+- **No GPU required!**
 
 ## Quick Start
 
-### GPU Deployment
+### Option A: Whisper (CPU - Works Now!) 🎯 Recommended for CPU
+
+1. **Start the Whisper service:**
+
+```bash
+docker compose -f docker-compose-whisper.yaml up -d
+```
+
+2. **Check if it's running:**
+
+```bash
+curl http://localhost:9000/health
+```
+
+3. **Transcribe an audio file:**
+
+```bash
+curl -X POST "http://localhost:9000/asr" \
+  -F "audio_file=@your-audio.mp3" \
+  -F "task=transcribe" \
+  -F "language=en" \
+  -F "output=json"
+```
+
+**Response:**
+```json
+{
+  "text": "Your transcribed text here",
+  "language": "en"
+}
+```
+
+That's it! The Whisper service will:
+- Download the model on first run (~150MB for base model)
+- Cache it for future use
+- Be ready to transcribe audio files on CPU
+
+### Option B: Voxtral (GPU Required)
 
 1. **Build and start the service:**
 
@@ -45,23 +107,13 @@ Docker containerization for deploying Mistral AI's **Voxtral-Mini-4B-Realtime-26
 docker compose up -d --build
 ```
 
-### CPU Deployment
-
-1. **Start the CPU service:**
-
-```bash
-docker compose -f docker-compose-cpu.yaml up -d
-```
-
-### Verify Service is Running
-
 2. **Check health:**
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-3. **Test with a quick transcription:**
+3. **Test transcription:**
 
 ```bash
 curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
@@ -69,25 +121,146 @@ curl -X POST "http://localhost:8000/v1/audio/transcriptions" \
   -F "model=mistralai/Voxtral-Mini-4B-Realtime-2602"
 ```
 
-The service will:
-- Download the Voxtral model from HuggingFace on first run (cached afterwards)
+The Voxtral service will:
+- Download the model from HuggingFace on first run (~4GB)
 - Start the vLLM server on port 8000
-- Be ready to accept audio files for transcription
+- Provide GPU-accelerated transcription
 
-## Model Capabilities
-
-**Voxtral-Mini-4B-Realtime-2602** is a speech-to-text transcription model that:
-- Supports 13 languages: English, Spanish, French, Portuguese, Hindi, German, Dutch, Italian, Arabic, Chinese, Japanese, Korean, Russian
-- Works in two modes:
-  - **Batch mode**: Upload complete audio files for transcription (works on GPU and CPU)
-  - **Streaming mode**: Real-time transcription with <500ms latency (GPU only)
-- Handles various audio formats: MP3, WAV, M4A, FLAC, OGG, and more
+---
 
 ## Usage Examples
 
-### Batch Transcription (File Upload → Text)
+### Whisper ASR API (CPU-Compatible)
 
-This is the most common use case and works well on both GPU and CPU deployments.
+Running on port 9000 by default.
+
+**Basic transcription:**
+
+```bash
+curl -X POST "http://localhost:9000/asr" \
+  -F "audio_file=@meeting.mp3" \
+  -F "task=transcribe" \
+  -F "language=en" \
+  -F "output=json"
+```
+
+**Response:**
+```json
+{
+  "text": "This is the transcribed text from your audio file.",
+  "language": "en"
+}
+```
+
+**With word-level timestamps:**
+
+```bash
+curl -X POST "http://localhost:9000/asr" \
+  -F "audio_file=@podcast.wav" \
+  -F "task=transcribe" \
+  -F "language=en" \
+  -F "output=json" \
+  -F "word_timestamps=true"
+```
+
+**Response with timestamps:**
+```json
+{
+  "text": "Hello world",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 0.5,
+      "text": "Hello"
+    },
+    {
+      "start": 0.5,
+      "end": 1.0,
+      "text": "world"
+    }
+  ],
+  "language": "en"
+}
+```
+
+**Auto-detect language (no language parameter):**
+
+```bash
+curl -X POST "http://localhost:9000/asr" \
+  -F "audio_file=@unknown-language.mp3" \
+  -F "task=transcribe" \
+  -F "output=json"
+```
+
+**Translate to English (for non-English audio):**
+
+```bash
+curl -X POST "http://localhost:9000/asr" \
+  -F "audio_file=@spanish-audio.mp3" \
+  -F "task=translate" \
+  -F "output=json"
+```
+
+**Supported audio formats:**
+- MP3, MP4, MPEG, MPGA, M4A
+- WAV, WEBM, OGG, FLAC
+- Virtually any format (FFmpeg support)
+
+**Available output formats:**
+- `json` - JSON with transcription text
+- `srt` - SubRip subtitle format
+- `vtt` - WebVTT subtitle format
+- `tsv` - Tab-separated values
+- `txt` - Plain text
+
+**Python client example:**
+
+```python
+import requests
+
+# Transcribe audio file
+with open("audio.mp3", "rb") as f:
+    response = requests.post(
+        "http://localhost:9000/asr",
+        files={"audio_file": f},
+        data={
+            "task": "transcribe",
+            "language": "en",
+            "output": "json"
+        }
+    )
+
+result = response.json()
+print(result["text"])
+```
+
+**Batch processing multiple files:**
+
+```python
+import requests
+from pathlib import Path
+
+audio_dir = Path("./audio_files")
+output_dir = Path("./transcriptions")
+output_dir.mkdir(exist_ok=True)
+
+for audio_file in audio_dir.glob("*.mp3"):
+    print(f"Transcribing {audio_file.name}...")
+    
+    with open(audio_file, "rb") as f:
+        response = requests.post(
+            "http://localhost:9000/asr",
+            files={"audio_file": f},
+            data={"task": "transcribe", "language": "en", "output": "json"}
+        )
+    
+    result = response.json()
+    output_file = output_dir / f"{audio_file.stem}.txt"
+    output_file.write_text(result["text"])
+    print(f"✓ Saved to {output_file}")
+```
+
+### Voxtral API (GPU Only)
 
 **Basic transcription with curl:**
 
@@ -324,19 +497,77 @@ sf.write("output.wav", audio, 16000, subtype='PCM_16')
 
 ## Configuration
 
-### Environment Variables
+### Whisper Configuration (docker-compose-whisper.yaml)
 
-**Common Variables:**
+**Environment Variables:**
+
+- `ASR_MODEL`: Model size - `tiny`, `base` (recommended), `small`, `medium`, `large`
+  - `tiny` - Fastest, less accurate (~40MB)
+  - `base` - **Recommended for CPU** - good balance (~150MB)
+  - `small` - Better accuracy, slower (~500MB)
+  - `medium` - High accuracy, slow (~1.5GB)
+  - `large` - Best accuracy, very slow (~3GB)
+
+- `ASR_ENGINE`: Backend engine - `faster_whisper` (recommended), `openai_whisper`, `whisperx`
+  - `faster_whisper` - **4x faster on CPU**, optimized
+  - `openai_whisper` - Original implementation
+  - `whisperx` - Includes speaker diarization
+
+- `ASR_LANGUAGE`: Default language (optional, auto-detect if not set)
+  - Examples: `en`, `es`, `fr`, `de`, `zh`, etc.
+
+- `ASR_WORD_TIMESTAMPS`: Enable word-level timestamps (`True`/`False`)
+
+**Example - Customize model:**
+
+```yaml
+environment:
+  - ASR_MODEL=small  # Use larger model for better accuracy
+  - ASR_ENGINE=faster_whisper
+  - ASR_LANGUAGE=en  # Set default language
+  - ASR_WORD_TIMESTAMPS=True
+```
+
+**Port Configuration:**
+
+Whisper runs on port 9000 by default. To change:
+
+```yaml
+ports:
+  - "YOUR_PORT:9000"
+```
+
+**Memory Limits:**
+
+Adjust based on your system and model size:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 8G  # Increase for larger models
+    reservations:
+      memory: 4G
+```
+
+### Voxtral Configuration (docker-compose.yaml)
+
+**Environment Variables:**
+
 - `VLLM_VERSION`: vLLM Docker image version (default: `latest`)
 - `VLLM_DISABLE_COMPILE_CACHE`: Disable compilation cache (set to `1`)
 - `VLLM_MAX_AUDIO_CLIP_FILESIZE_MB`: Maximum audio file size in MB (default: `25`)
 
-**CPU-Specific Variables** (for `docker-compose-cpu.yaml`):
-- `VLLM_CPU_KVCACHE_SPACE`: KV cache size in GB (default: `40`)
-- `VLLM_CPU_OMP_THREADS_BIND`: CPU core binding (set to `auto` for automatic)
-- `VLLM_CPU_NUM_OF_RESERVED_CPU`: Number of CPU cores reserved for framework (default: `1`)
+**Port Configuration:**
 
-### Audio Configuration
+Voxtral runs on port 8000 by default. To change:
+
+```yaml
+ports:
+  - "YOUR_PORT:8000"
+```
+
+**Audio Configuration:**
 
 For optimal performance with long recordings, you may need to increase the maximum model length:
 
@@ -359,16 +590,7 @@ entrypoint:
 - For 30 minutes: --max-model-len 22500
 - Formula: `recording_seconds / 0.08`
 
-### Port Configuration
-
-The service runs on port 8000 by default. To change it, modify the `docker-compose.yaml`:
-
-```yaml
-ports:
-  - "YOUR_PORT:8000"
-```
-
-### GPU Configuration
+**GPU Configuration:**
 
 By default, all available GPUs are used. To limit GPU usage, modify the `docker-compose.yaml`:
 
@@ -384,6 +606,17 @@ deploy:
 
 ## API Endpoints
 
+### Whisper ASR (Port 9000)
+
+- `POST /asr` - Audio transcription/translation
+  - Parameters: `audio_file`, `task` (transcribe/translate), `language`, `output` (json/srt/vtt/tsv/txt)
+  - Supports word-level timestamps and speaker diarization
+- `GET /health` - Health check
+
+**Full documentation:** [Whisper ASR Webservice Docs](https://github.com/ahmetoner/whisper-asr-webservice)
+
+### Voxtral vLLM (Port 8000)
+
 - `GET /health` - Health check
 - `GET /metrics` - Prometheus metrics
 - `GET /v1/models` - List available models
@@ -391,7 +624,7 @@ deploy:
 - `POST /v1/audio/translations` - Audio translation to English
 - `WS /v1/realtime` - WebSocket streaming for real-time transcription
 
-For full API documentation, see:
+**Full documentation:**
 - [vLLM Audio API](https://docs.vllm.ai/en/latest/serving/openai_compatible_server/#transcriptions-api)
 - [OpenAI Audio API Reference](https://platform.openai.com/docs/api-reference/audio)
 
@@ -400,42 +633,80 @@ For full API documentation, see:
 **View logs:**
 
 ```bash
-# For GPU deployment
-docker compose logs -f
+# For Whisper (CPU)
+docker compose -f docker-compose-whisper.yaml logs -f
 
-# For CPU deployment
-docker compose -f docker-compose-cpu.yaml logs -f
+# For Voxtral (GPU)
+docker compose logs -f
 ```
 
 **Check resource usage:**
 
 ```bash
-# For GPU deployment
-docker stats voxtral-voxtral-1
+# For Whisper
+docker stats whisper-asr
 
-# For CPU deployment
-docker stats voxtral-voxtral-cpu-1
+# For Voxtral
+docker stats voxtral-voxtral-1
 ```
 
-**Monitor GPU usage (GPU deployment only):**
+**Monitor GPU usage (Voxtral only):**
 
 ```bash
 nvidia-smi -l 1
 ```
 
-**Monitor CPU usage (CPU deployment):**
+**Monitor CPU usage (Whisper):**
 
 ```bash
 # Monitor overall CPU usage
 htop
 
-# Or use docker stats for container-specific metrics
+# Or use docker stats
 docker stats --no-stream
 ```
 
 ## Troubleshooting
 
-### Service won't start (GPU deployment)
+### Whisper Service Issues
+
+**Service won't start:**
+
+1. Check if container is running:
+```bash
+docker compose -f docker-compose-whisper.yaml ps
+```
+
+2. View logs:
+```bash
+docker compose -f docker-compose-whisper.yaml logs
+```
+
+3. Verify you have enough disk space for models (~150MB for base model)
+
+**Slow transcription:**
+
+This is expected on CPU. To improve speed:
+- Use a smaller model: Change `ASR_MODEL=tiny` in docker-compose-whisper.yaml
+- Use `faster_whisper` engine (default, already optimized)
+- Process shorter audio clips
+- Upgrade CPU or add more cores
+
+**Out of memory:**
+
+Increase Docker memory limits or use a smaller model:
+```yaml
+environment:
+  - ASR_MODEL=tiny  # Smallest, fastest
+```
+
+**Model download fails:**
+
+Check internet connection and disk space. Models are cached in the volume, so subsequent starts are faster.
+
+### Voxtral Service Issues (GPU)
+
+**Service won't start:**
 
 1. Verify GPU is available:
 ```bash
@@ -452,126 +723,120 @@ docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
 docker compose logs
 ```
 
-### Service won't start (CPU deployment)
+**Voxtral CPU deployment fails with "Engine core initialization failed":**
 
-1. Check if the container is running:
-```bash
-docker compose -f docker-compose-cpu.yaml ps
-```
+This is expected. Voxtral requires GPU and does not work on CPU with current vLLM versions.
 
-2. View logs for errors:
-```bash
-docker compose -f docker-compose-cpu.yaml logs
-```
+**Solutions:**
+1. **Use Whisper instead** (recommended for CPU):
+   ```bash
+   docker compose -f docker-compose-whisper.yaml up -d
+   ```
 
-3. Verify you have enough RAM (model requires ~8-16GB system memory)
+2. **Use GPU deployment** if you have GPU access:
+   ```bash
+   docker compose up -d --build
+   ```
 
-### Out of memory errors
+### General Issues
 
-**GPU deployment**: The Voxtral-Mini-4B model requires approximately 8GB of VRAM. For long audio files, you may need to increase `--max-model-len` or use a GPU with more memory.
+**Out of memory errors:**
 
-**CPU deployment**: Increase Docker memory limits or system swap space. The model requires 8-16GB of system RAM.
+**Whisper:** Use a smaller model or increase Docker memory limits.
 
-### Slow transcription performance (CPU deployment)
+**Voxtral:** The model requires approximately 8GB of VRAM. Use a GPU with sufficient memory.
 
-This is expected behavior for CPU inference. See the comparison table above for expected processing times.
+**Audio file too large:**
 
-**Performance tips for CPU:**
-- Process shorter audio clips
-- Use batch processing for multiple files
-- Consider GPU deployment if you need faster results
-- Ensure your system has enough RAM (8-16GB recommended)
-
-### Audio file too large
-
-Increase the maximum file size limit:
+For Voxtral, increase the file size limit:
 
 ```yaml
 environment:
   - VLLM_MAX_AUDIO_CLIP_FILESIZE_MB=100
 ```
 
-### Unsupported audio format
+**Unsupported audio format:**
 
-Convert your audio to a supported format (MP3, WAV, M4A, etc.) using ffmpeg:
+Both services support most formats. If you encounter issues, convert using ffmpeg:
 
 ```bash
 ffmpeg -i input.avi -vn -ar 16000 -ac 1 output.wav
 ```
 
-### Model download is slow
+**Model download is slow:**
 
-The model is downloaded on first run and cached. Subsequent starts will be much faster. To pre-download the model:
+Models are downloaded on first run and cached. Subsequent starts are much faster.
 
-```bash
-docker compose run --rm voxtral python -c "from huggingface_hub import snapshot_download; snapshot_download('mistralai/Voxtral-Mini-4B-Realtime-2602')"
-```
+For Whisper, models are ~40MB (tiny) to ~3GB (large).
+For Voxtral, the model is ~4GB.
 
 ## Stopping the Service
 
-**GPU deployment:**
+**Whisper (CPU):**
+
+```bash
+docker compose -f docker-compose-whisper.yaml down
+```
+
+**Voxtral (GPU):**
 
 ```bash
 docker compose down
 ```
 
-**CPU deployment:**
+**To also remove cached models:**
 
 ```bash
-docker compose -f docker-compose-cpu.yaml down
-```
+# Whisper
+docker compose -f docker-compose-whisper.yaml down -v
 
-To also remove the cached model (both deployments):
-
-```bash
-# GPU
+# Voxtral
 docker compose down -v
-
-# CPU
-docker compose -f docker-compose-cpu.yaml down -v
 ```
 
 ## Tech Stack
 
-- **vLLM**: High-performance LLM inference engine with audio support (GPU and CPU)
-- **Voxtral-Mini-4B-Realtime-2602**: Mistral AI's real-time speech transcription model
+### Whisper ASR
+- **faster-whisper**: Optimized Whisper implementation (4x faster on CPU)
+- **Whisper ASR Webservice**: OpenAI-compatible REST API wrapper
 - **Docker**: Containerization
-- **CUDA**: GPU acceleration (GPU deployment only)
+- **FFmpeg**: Universal audio format support
+
+### Voxtral vLLM
+- **vLLM**: High-performance LLM inference engine
+- **Voxtral-Mini-4B-Realtime-2602**: Mistral AI's real-time transcription model
+- **CUDA**: GPU acceleration
+- **Docker**: Containerization
 - **Audio Processing**: librosa, soundfile, soxr
 
-## Deployment Comparison
+## Model Comparison
 
-| Feature | GPU Deployment | CPU Deployment |
-|---------|----------------|----------------|
-| **Processing Speed** | ⚡ Very Fast (2-5s for 1min audio) | 🐌 Slower (15-30s for 1min audio) |
-| **Best For** | Production, high volume, real-time | Development, testing, low volume |
-| **Batch Transcription** | ✅ Excellent | ✅ Good (if speed isn't critical) |
-| **Real-time Streaming** | ✅ Yes (<500ms latency) | ❌ No (too slow) |
-| **Hardware Required** | NVIDIA GPU (8GB+ VRAM) | x86_64 or ARM64 CPU (8GB+ RAM) |
-| **Docker Compose File** | `docker-compose.yaml` | `docker-compose-cpu.yaml` |
-| **Docker Image** | `voxtral-vllm` (custom built) | `vllm/vllm-openai-cpu` |
-| **Cost** | Higher (GPU infrastructure) | Lower (standard CPU) |
-
-**Recommendation:**
-- 📁 **Batch transcription (file upload)**: Both GPU and CPU work fine. Use GPU for faster processing, CPU if speed isn't critical.
-- 🎙️ **Real-time streaming**: GPU required - CPU is too slow for real-time.
+| Feature | Whisper (CPU) | Voxtral (GPU) |
+|---------|---------------|---------------|
+| **Hardware** | ✅ CPU (no GPU needed) | GPU required (8GB+ VRAM) |
+| **Model Size** | 40MB - 3GB (configurable) | ~4GB |
+| **Processing Speed (1min audio)** | 5-30s (depends on model size) | 2-5s |
+| **Languages** | 99 languages | 13 languages |
+| **Batch Transcription** | ✅ Yes | ✅ Yes |
+| **Real-time Streaming** | ❌ No | ✅ Yes (<500ms) |
+| **Word Timestamps** | ✅ Yes | ✅ Yes |
+| **Speaker Diarization** | ✅ Yes (with whisperX) | ❌ No |
+| **API Compatibility** | OpenAI-like | OpenAI-compatible |
+| **Docker Image** | `onerahmet/openai-whisper-asr-webservice` | Custom vLLM build |
+| **Port** | 9000 | 8000 |
+| **Best For** | CPU users, batch processing, cost-effective | GPU users, real-time, high throughput |
 
 ## Supported Languages
 
-Voxtral supports transcription in 13 languages:
-- English (en)
-- Spanish (es)
-- French (fr)
-- Portuguese (pt)
-- Hindi (hi)
-- German (de)
-- Dutch (nl)
-- Italian (it)
-- Arabic (ar)
-- Chinese (zh)
-- Japanese (ja)
-- Korean (ko)
-- Russian (ru)
+**Whisper** supports 99 languages including:
+- English, Spanish, French, German, Italian, Portuguese
+- Chinese, Japanese, Korean, Arabic, Russian, Hindi
+- And 87 more languages ([full list](https://github.com/openai/whisper#available-models-and-languages))
+
+**Voxtral** supports 13 languages:
+- English (en), Spanish (es), French (fr), Portuguese (pt)
+- Hindi (hi), German (de), Dutch (nl), Italian (it)
+- Arabic (ar), Chinese (zh), Japanese (ja), Korean (ko), Russian (ru)
 
 ## License
 
@@ -579,8 +844,14 @@ MIT License - Copyright 2026 innFactory AI Consulting
 
 ## Resources
 
+### Whisper ASR
+- [Whisper ASR Webservice GitHub](https://github.com/ahmetoner/whisper-asr-webservice)
+- [OpenAI Whisper](https://github.com/openai/whisper)
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+
+### Voxtral vLLM
 - [vLLM Documentation](https://docs.vllm.ai/)
 - [vLLM Audio/Realtime API](https://docs.vllm.ai/en/latest/serving/openai_compatible_server/#realtime-api)
 - [Mistral AI Voxtral](https://mistral.ai/news/voxtral/)
-- [OpenAI Audio API Reference](https://platform.openai.com/docs/api-reference/audio)
 - [Voxtral HuggingFace Model](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602)
+- [OpenAI Audio API Reference](https://platform.openai.com/docs/api-reference/audio)
