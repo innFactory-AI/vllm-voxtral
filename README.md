@@ -40,6 +40,19 @@ Docker containerization for deploying speech transcription models with OpenAI-co
 - 📁 **Batch transcription**: Reliable file-based transcription
 - 🌍 **Multilingual support**: 99 languages
 - 🔌 **OpenAI-compatible API**: Easy integration
+- 🚀 **Automatic model initialization**: Models are downloaded automatically on first startup (no manual steps!)
+
+### Automatic Model Management (Whisper)
+
+The Whisper deployment includes an **automated initialization script** that:
+- ✅ **Automatically downloads** the specified model on first container startup
+- ✅ **Waits for API readiness** before starting (no timing issues)
+- ✅ **Checks for existing models** to avoid redundant downloads
+- ✅ **Maps short names** (`base`, `small`, etc.) to full Hugging Face paths
+- ✅ **Caches models** in a Docker volume for instant subsequent starts
+- ✅ **Handles errors gracefully** with clear logging
+
+**No manual model downloads required!** Just start the container and go.
 
 ## Common Use Cases
 
@@ -74,13 +87,37 @@ Docker containerization for deploying speech transcription models with OpenAI-co
 docker compose -f docker-compose-whisper.yaml up -d
 ```
 
-2. **Check if it's running:**
+The service will **automatically**:
+- Wait for the API to be ready
+- Download the model specified in `WHISPER__MODEL` (default: `base` model, ~150MB)
+- Cache it for future use
+- Start accepting transcription requests
+
+2. **Monitor the initialization (optional):**
+
+```bash
+docker compose -f docker-compose-whisper.yaml logs -f whisper
+```
+
+You'll see output like:
+```
+=== Speaches Whisper Model Initialization ===
+Model 'base' mapped to 'Systran/faster-whisper-base'
+Waiting for Speaches API to be ready...
+✓ API is ready!
+Checking if model 'Systran/faster-whisper-base' is already available...
+Downloading model 'Systran/faster-whisper-base'...
+✓ Model 'Systran/faster-whisper-base' downloaded successfully!
+=== Initialization Complete ===
+```
+
+3. **Check if it's running:**
 
 ```bash
 curl http://localhost:9000/health
 ```
 
-3. **Transcribe an audio file:**
+4. **Transcribe an audio file:**
 
 ```bash
 # Works with MP3, WAV, M4A (iPhone voice memos!), and more
@@ -106,10 +143,10 @@ curl -X POST "http://localhost:9000/v1/audio/transcriptions" \
 ```
 
 That's it! The Whisper service will:
-- Download the model on first run (~150MB for base model)
-- Cache it for future use
-- Be ready to transcribe audio files on CPU
-- **Support M4A files natively** (iPhone voice memos work perfectly!)
+- ✅ **Automatically download the model on first startup** (no manual steps!)
+- ✅ Cache models for instant future startups
+- ✅ Work on CPU without any GPU
+- ✅ **Support M4A files natively** (iPhone voice memos work perfectly!)
 
 ### Option B: Voxtral (GPU Required)
 
@@ -523,15 +560,31 @@ sf.write("output.wav", audio, 16000, subtype='PCM_16')
 
 Whisper is powered by **Speaches** (faster-whisper server) with native M4A support.
 
+**Automatic Model Download:**
+
+The service uses an initialization script (`init-whisper-model.sh`) that automatically:
+- ✅ Waits for the Speaches API to be ready
+- ✅ Downloads the model specified in `WHISPER__MODEL` on first startup
+- ✅ Checks if model is already cached (skips download on subsequent starts)
+- ✅ Maps short model names to full Hugging Face paths automatically
+
+**Supported model names:** `tiny`, `base`, `small`, `medium`, `large`, `turbo`
+
+The init script automatically maps these to their full paths:
+- `base` → `Systran/faster-whisper-base`
+- `large` → `Systran/faster-whisper-large-v3`
+- etc.
+
 **Environment Variables:**
 
 - `WHISPER__MODEL`: Model size - `tiny`, `base` (recommended), `small`, `medium`, `large`, `turbo`
-  - `tiny` - Fastest, less accurate (~40MB)
-  - `base` - **Recommended for CPU** - good balance (~150MB)
-  - `small` - Better accuracy, slower (~500MB)
-  - `medium` - High accuracy, slow (~1.5GB)
-  - `large` - Best accuracy, very slow (~3GB)
-  - `turbo` - Latest OpenAI model, faster than large
+  - `tiny` - Fastest, less accurate (~40MB) - **Auto-downloaded on startup**
+  - `base` - **Recommended for CPU** - good balance (~150MB) - **Auto-downloaded on startup**
+  - `small` - Better accuracy, slower (~500MB) - **Auto-downloaded on startup**
+  - `medium` - High accuracy, slow (~1.5GB) - **Auto-downloaded on startup**
+  - `large` - Best accuracy, very slow (~3GB) - **Auto-downloaded on startup**
+  - `turbo` - Latest OpenAI model, faster than large - **Auto-downloaded on startup**
+  - **Note:** The init script automatically downloads the specified model on first container start
 
 - `WHISPER__COMPUTE_TYPE`: CPU optimization - `int8` (recommended), `int8_float32`, `float16`
   - `int8` - **Fastest on CPU**, 4x faster than original
@@ -717,12 +770,36 @@ docker stats --no-stream
 docker compose -f docker-compose-whisper.yaml ps
 ```
 
-2. View logs:
+2. View logs (including model download progress):
 ```bash
-docker compose -f docker-compose-whisper.yaml logs
+docker compose -f docker-compose-whisper.yaml logs -f whisper
 ```
 
 3. Verify you have enough disk space for models (~150MB for base model)
+
+**Model download during initialization:**
+
+The init script automatically downloads the model on first startup. You'll see logs like:
+```
+=== Speaches Whisper Model Initialization ===
+Downloading model 'Systran/faster-whisper-base'...
+✓ Model downloaded successfully!
+```
+
+If the model download fails:
+- Check internet connection
+- Verify disk space is available
+- The container will start anyway, and you can manually download the model:
+  ```bash
+  curl -X POST "http://localhost:9000/v1/models/Systran%2Ffaster-whisper-base"
+  ```
+
+**To manually trigger model download (if needed):**
+
+```bash
+# After container is running
+curl -X POST "http://localhost:9000/v1/models/Systran%2Ffaster-whisper-base"
+```
 
 **Slow transcription:**
 
